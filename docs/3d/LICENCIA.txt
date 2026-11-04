@@ -1,0 +1,6 @@
+nucleo.glb = «Transformers Alliance Core» de OrangeSauceu
+https://sketchfab.com/orangesauceu
+Fuente: https://sketchfab.com/3d-models/transformers-alliance-core-4ce5ab6c25084ddaa382fde6649d416b
+Licencia: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Cambios: se quitaron texturas, esqueleto y nodos sin uso, y se comprimió la geometría (meshopt).
+Atribución obligatoria: crédito visible en el pie de las páginas que muestran la escena.

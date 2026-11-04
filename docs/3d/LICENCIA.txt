@@ -1,6 +1,14 @@
-nucleo.glb = «Transformers Alliance Core» de OrangeSauceu
-https://sketchfab.com/orangesauceu
-Fuente: https://sketchfab.com/3d-models/transformers-alliance-core-4ce5ab6c25084ddaa382fde6649d416b
-Licencia: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
-Cambios: se quitaron texturas, esqueleto y nodos sin uso, y se comprimió la geometría (meshopt).
-Atribución obligatoria: crédito visible en el pie de las páginas que muestran la escena.
+Modelos 3D usados en este sitio (reducidos con gltf-transform: texturas WebP de 1024 px y mallas cuantizadas).
+
+casco.glb — «Damaged Helmet»
+  Versión actual © 2018 ctxwing, licencia CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+  Basado en el trabajo © 2016 theblueturtle_, licencia CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/).
+  Fuente: Khronos glTF-Sample-Assets.
+
+camara.glb — «Antique Camera», © 2018 UX3D, CC0 1.0. Fuente: Khronos glTF-Sample-Assets.
+
+radio.glb — «BoomBox», © 2017 Microsoft, CC0 1.0. Fuente: Khronos glTF-Sample-Assets.
+
+zapatilla.glb — modelo propio de Juan Eduardo Wong Cavero.
+
+Visor: <model-viewer> 4.1.0 de Google, licencia Apache 2.0 (ver /vendor/model-viewer/LICENSE.txt).

@@ -176,7 +176,7 @@ class SitioTests(unittest.TestCase):
                         self.assertIn("alt", attrs)
                     if node["tag"] == "script":
                         self.assertIn(attrs.get("type"),
-                                      {"application/ld+json", "importmap", "module"},
+                                      {"application/ld+json", "module"},
                                       "Sólo datos estructurados y escena decorativa")
                         if attrs.get("type") == "module":
                             self.assertEqual(attrs.get("src"), "/3d/escena.js")
@@ -282,7 +282,7 @@ class SitioTests(unittest.TestCase):
         except ET.ParseError as error:
             self.fail(f"Favicon inválido: {error}")
         css = self.read("docs/estilos.css")
-        self.assertIn("prefers-color-scheme", css)
+        self.assertRegex(css, r"color-scheme\s*:\s*dark")
         self.assertRegex(css, r":focus(?:-visible)?")
         self.assertNotRegex(css, r"@import|https?://")
         self.assertEqual(list(DOCS.rglob("*.css")), [DOCS / "estilos.css"])
@@ -296,43 +296,40 @@ class SitioTests(unittest.TestCase):
         for route in ROUTES:
             self.assertIn(BASE + route, links)
 
-    def test_3d_scripts_identicos_y_credito_en_nueve_paginas(self):
-        expected_map = {"imports": {
-            "three": "/vendor/three/three.module.min.js",
-            "three/addons/": "/vendor/three/addons/",
-        }}
+    def test_3d_modulo_unico_y_credito_en_nueve_paginas(self):
         for route in (*ROUTES, "404.html"):
             with self.subTest(route=route):
                 _, page = self.page(route)
-                mapping = self.one(page.find("script", type="importmap"), "Import map único")
-                try:
-                    self.assertEqual(json.loads(mapping["text"]), expected_map)
-                except json.JSONDecodeError as error:
-                    self.fail(f"Import map inválido: {error}")
+                self.assertFalse(page.find("script", type="importmap"), "Sin import map")
                 module = self.one(page.find("script", type="module"), "Módulo único")
                 self.assertEqual(module["attrs"].get("src"), "/3d/escena.js")
                 self.assertFalse(module["text"].strip(), "Sin JavaScript inline")
-                self.assertTrue((DOCS / "3d/escena.js").is_file(), "Falta escena compartida")
-                for target in expected_map["imports"].values():
-                    local = DOCS / target.lstrip("/")
-                    self.assertTrue(local.is_dir() if target.endswith("/") else local.is_file())
                 footer = self.one(page.find("footer"), "Pie único")
                 credit = self.one([node for node in page.find("a", href="/3d/LICENCIA.txt")
                                    if footer in node["parents"]], "Crédito local en el pie")
-                self.assertEqual(" ".join(credit["text"].split()),
-                                 "Modelo 3D: Alliance Core, de OrangeSauceu (CC BY 4.0)")
+                for model in ("Damaged Helmet", "Antique Camera", "BoomBox"):
+                    self.assertIn(model, credit["text"])
                 for node in page.nodes:
                     self.assertFalse(any(key.lower().startswith("on") for key in node["attrs"]),
                                      "Sin manejadores ejecutables inline")
                 self.assertFalse(page.find("style"), "CSS únicamente en estilos.css")
                 self.assertEqual([node["attrs"].get("href") for node in
                                   page.find("link", rel="stylesheet")], ["/estilos.css"])
+                # Cada escena trae su imagen (se ve sin WebGL) y un modelo local con ángulo inicial.
+                for scene in [n for n in page.find("div") if "data-modelo" in n["attrs"]]:
+                    model = scene["attrs"].get("data-modelo", "")
+                    self.assertRegex(model, r"^/3d/[\w-]+\.glb$")
+                    self.assertTrue((DOCS / model.lstrip("/")).is_file(), f"Falta {model}")
+                    self.assertRegex(scene["attrs"].get("data-orbita", ""), r"^-?\d+ -?\d+$")
+                    images = [n for n in page.find("img") if scene in n["parents"]]
+                    self.assertEqual(len(images), 1, "Imagen de respaldo por escena")
+                    self.assertTrue(images[0]["attrs"].get("alt"))
 
-    def test_3d_fuentes_locales_y_paleta_clara_oscura(self):
+    def test_fuentes_locales_y_paleta_oscura(self):
         css = self.read("docs/estilos.css")
         self.assertNotIn("mix-blend-mode", css.lower())
         faces = re.findall(r"@font-face\s*\{([^}]+)\}", css, re.I)
-        for family in ("Inter", "Space Mono"):
+        for family in ("Playfair Display", "Inter", "JetBrains Mono"):
             with self.subTest(family=family):
                 matching = [face for face in faces if re.search(
                     r"font-family\s*:\s*['\"]?" + re.escape(family) + r"['\"]?\s*;", face, re.I)]
@@ -345,19 +342,14 @@ class SitioTests(unittest.TestCase):
                         target = DOCS / url.lstrip("/")
                         self.assertTrue(target.is_file(), f"Fuente inexistente: {url}")
                         self.assertEqual(target.parent, DOCS / "fuentes")
-        light = re.search(r":root\s*\{([^}]+)\}", css)
-        dark = re.search(r"@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{\s*:root\s*\{([^}]+)\}", css)
-        self.assertIsNotNone(light, "Tokens claros en :root")
-        self.assertIsNotNone(dark, "Tokens oscuros en :root")
-        for block, background, ink in ((light, "#EBEAE8", "#0F0F0F"),
-                                       (dark, "#0F0F0F", "#EBEAE8")):
-            with self.subTest(background=background):
-                tokens = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;}]+)", block[1]))
-                self.assertEqual(tokens.get("--bg", "").strip().upper(), background)
-                self.assertEqual(tokens.get("--ink", "").strip().upper(), ink)
-        self.assertRegex(css.lower(), r"--accent\s*:\s*#ff4d00\b")
+        root = re.search(r":root\s*\{([^}]+)\}", css)
+        self.assertIsNotNone(root, "Tokens en :root")
+        self.assertRegex(root[1], r"color-scheme\s*:\s*dark")
+        tokens = dict(re.findall(r"(--[\w-]+)\s*:\s*([^;}]+)", root[1]))
+        self.assertEqual(tokens.get("--bg", "").strip().lower(), "#050806")
+        self.assertRegex(css, r"@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)")
 
-    def test_contraste_aa_de_tokens_y_estados(self):
+    def test_contraste_aa_de_tokens(self):
         css = self.read("docs/estilos.css")
 
         def luminance(color):
@@ -366,44 +358,29 @@ class SitioTests(unittest.TestCase):
                       for c in channels]
             return sum(c * weight for c, weight in zip(linear, (.2126, .7152, .0722)))
 
-        for block in re.findall(r":root\s*\{([^}]+)\}", css):
-            tokens = dict(re.findall(r"(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})", block))
-            # Dark mode inherits the orange used by hover/selection from :root.
-            tokens.setdefault("--accent", "#FF4D00")
-            for foreground, background in ((tokens["--ink"], tokens["--bg"]),
-                                          (tokens["--muted"], tokens["--bg"]),
-                                          ("#0F0F0F", tokens["--accent"])):
-                with self.subTest(foreground=foreground, background=background):
-                    a, b = sorted((luminance(foreground), luminance(background)))
-                    self.assertGreaterEqual((b + .05) / (a + .05), 4.5)
-        # Even a white glass reflection must leave the dark-mode text legible.
-        opacity = float(re.search(r"\.scene\s*\{\s*opacity\s*:\s*([\d.]+)", css)[1])
-        brightest = min(255, int(255 * opacity + 15 * (1 - opacity)) + 1)
-        reflection = "#" + f"{brightest:02x}" * 3
-        self.assertGreaterEqual((luminance("#EBEAE8") + .05) /
-                                (luminance(reflection) + .05), 4.5)
+        tokens = dict(re.findall(r"(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})",
+                                 re.search(r":root\s*\{([^}]+)\}", css)[1]))
+        for name in ("--text", "--muted", "--brand", "--gold"):
+            with self.subTest(token=name):
+                a, b = sorted((luminance(tokens[name]), luminance(tokens["--bg"])))
+                self.assertGreaterEqual((b + .05) / (a + .05), 4.5)
 
-    def test_3d_canvas_decorativo_y_recursos_de_escena_locales(self):
+    def test_3d_visor_local_y_degradacion(self):
         scene = self.read("docs/3d/escena.js")
-        css = self.read("docs/estilos.css")
         self.assertRegex(scene, r"aria-hidden['\"]\s*,\s*['\"]true['\"]")
-        self.assertRegex(css, r"position\s*:\s*fixed")
-        self.assertRegex(css, r"pointer-events\s*:\s*none")
-        self.assertNotIn("mix-blend-mode", scene.lower())
         self.assertNotRegex(scene, r"https?://|console\.(?:error|warn)\s*\(")
-        imports = re.findall(r"(?:from\s*|import\s*)['\"]([^'\"]+)['\"]", scene)
-        self.assertIn("three", imports)
-        for dependency in ("environments/RoomEnvironment.js", "loaders/GLTFLoader.js",
-                           "libs/meshopt_decoder.module.js"):
-            self.assertIn("three/addons/" + dependency, imports)
-            self.assertTrue((DOCS / "vendor/three/addons" / dependency).is_file())
-        self.assertIn("/3d/nucleo.glb", scene)
-        self.assertTrue((DOCS / "3d/nucleo.glb").is_file())
-        for feature in ("WebGLRenderer", "PMREMGenerator", "RoomEnvironment", "GLTFLoader",
-                        "setMeshoptDecoder", "Box3", "MeshPhysicalMaterial", "CanvasTexture",
-                        "prefers-reduced-motion", "visibilitychange", "resize"):
+        self.assertNotIn("mix-blend-mode", scene.lower())
+        imports = re.findall(r"import\(\s*['\"]([^'\"]+)['\"]", scene)
+        self.assertEqual(imports, ["/vendor/model-viewer/model-viewer.min.js"])
+        self.assertTrue((DOCS / "vendor/model-viewer/model-viewer.min.js").is_file())
+        self.assertTrue((DOCS / "vendor/model-viewer/LICENSE.txt").is_file())
+        for feature in ("prefers-reduced-motion", "webgl2", "IntersectionObserver", "pointermove"):
             with self.subTest(feature=feature):
                 self.assertIn(feature, scene)
+        licence = self.read("docs/3d/LICENCIA.txt")
+        for term in ("Damaged Helmet", "Antique Camera", "BoomBox", "model-viewer", "Apache"):
+            self.assertIn(term, licence)
+        self.assertFalse((DOCS / "vendor/three").exists(), "Sin three.js suelto: el visor lo trae")
 
     def test_3d_sin_credenciales_inventadas_en_texto_editorial(self):
         # Sólo HTML editorial: las licencias y avisos de three.js se conservan intactos.

@@ -147,7 +147,7 @@ class SitioTests(unittest.TestCase):
                 self.assertTrue(person.get("jobTitle"))
                 self.assertTrue(person.get("knowsAbout"))
                 self.assertEqual(person.get("url"), BASE)
-                self.assertEqual(person.get("sameAs"), [GITHUB])
+                self.assertEqual(person.get("sameAs"), [GITHUB, "https://www.facebook.com/juaneduardo.wongcavero.5", "https://www.pinterest.com/jewc20009/"])
                 self.assertTrue(typed("WebSite"))
                 self.assertTrue(typed("WebPage") or typed("ProfilePage"))
                 self.assertTrue(typed("BreadcrumbList"))

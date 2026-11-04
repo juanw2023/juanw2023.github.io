@@ -7,6 +7,9 @@ REPO=juanw2023/juanw2023.github.io
 git push origin HEAD:main
 gh api "repos/$REPO/pages" >/dev/null 2>&1 ||
     gh api -X POST "repos/$REPO/pages" -f 'source[branch]=main' -f 'source[path]=/docs' >/dev/null
+# El repo de usuario nace con Pages en la raíz: forzar /docs.
+[ "$(gh api "repos/$REPO/pages" --jq .source.path)" = /docs ] ||
+    gh api -X PUT "repos/$REPO/pages" -f 'source[branch]=main' -f 'source[path]=/docs' >/dev/null
 
 if [ -f perfil/README.md ]; then
     PERFIL=juanw2023/juanw2023
